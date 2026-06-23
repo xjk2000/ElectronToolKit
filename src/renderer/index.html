@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ElectronToolKit</title>
+    <link rel="stylesheet" href="./styles.css?v=20260621-v014" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span>
+          </div>
+          <div class="brand-copy">
+            <h1 id="app-name">ElectronToolKit</h1>
+            <p>本地快捷工具箱</p>
+            <small id="app-version">v-</small>
+          </div>
+        </div>
+
+        <label class="search-box" for="tool-search">
+          <span>⌘</span>
+          <input id="tool-search" type="search" placeholder="搜索工具，例如 json、md5、url" autocomplete="off" />
+        </label>
+
+        <button class="notes-entry" id="notes-entry" type="button">
+          <span>任务便笺</span>
+          <small>悬浮提醒</small>
+        </button>
+        <button class="module-entry totp-entry" id="totp-entry" type="button">
+          <span>2FA 验证码</span>
+          <small>菜单栏复制</small>
+        </button>
+        <button class="module-entry gitlab-entry" id="gitlab-entry" type="button">
+          <span>GitLab 助手</span>
+          <small>项目同步 / CI</small>
+        </button>
+        <button class="module-entry cc-switch-entry" id="cc-switch-entry" type="button">
+          <span>模型切换</span>
+          <small>Claude / Codex / Gemini</small>
+        </button>
+
+        <nav class="tool-list" id="tool-list" aria-label="工具列表"></nav>
+      </aside>
+
+      <section class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p class="tool-category" id="tool-category">开发</p>
+            <h2 id="tool-title">JSON 格式化</h2>
+            <p id="tool-description">格式化、压缩或校验 JSON 文本。</p>
+          </div>
+          <div class="header-actions">
+            <button class="secondary-button" id="paste-button" type="button">粘贴</button>
+            <button class="secondary-button" id="copy-button" type="button">复制结果</button>
+          </div>
+        </header>
+
+        <div class="tool-controls" id="tool-controls"></div>
+        <div class="tool-options" id="tool-options"></div>
+        <div class="editor-grid" id="editor-grid">
+          <label class="editor-panel" id="input-panel">
+            <span id="input-label">输入</span>
+            <textarea id="input" spellcheck="false"></textarea>
+          </label>
+          <div class="editor-panel" id="output-panel">
+            <div class="panel-head output-head">
+              <span id="output-label">输出</span>
+              <div class="output-search" id="output-search" aria-label="搜索输出">
+                <input id="output-search-input" type="search" placeholder="搜索结果" autocomplete="off" />
+                <small id="output-search-count">0</small>
+                <button id="output-search-prev" type="button" aria-label="上一个匹配">↑</button>
+                <button id="output-search-next" type="button" aria-label="下一个匹配">↓</button>
+              </div>
+            </div>
+            <div id="output" class="output-view" aria-label="输出"></div>
+          </div>
+        </div>
+
+        <footer class="status-bar">
+          <span id="status">准备就绪</span>
+          <span>快捷键：⌘/Ctrl + K 搜索工具，⌘/Ctrl + F 搜索输出，⌘/Ctrl + Enter 执行，⌘/Ctrl + Shift + Space 唤起窗口</span>
+        </footer>
+      </section>
+    </main>
+
+    <script type="module" src="./renderer.js?v=20260621-v014"></script>
+  </body>
+</html>

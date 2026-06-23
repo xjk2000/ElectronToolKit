@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>任务便笺</title>
+    <link rel="stylesheet" href="./note.css?v=20260615-v013" />
+  </head>
+  <body>
+    <main class="note-shell" id="note-shell">
+      <div class="note-card" id="note-card">
+        <header class="note-drag">
+          <span class="note-grip" aria-hidden="true">拖动</span>
+          <input id="note-title" class="note-title" maxlength="80" />
+          <button id="note-close" class="note-close" type="button" aria-label="关闭便笺">×</button>
+        </header>
+        <textarea id="note-text" class="note-text" maxlength="4000" spellcheck="false"></textarea>
+        <footer class="note-footer">
+          <span id="note-reminder"></span>
+          <span>置顶便笺</span>
+        </footer>
+        <button id="note-resize" class="note-resize" type="button" aria-label="缩放便笺"></button>
+      </div>
+      <div class="note-resize-handle note-resize-handle-n" data-resize-edge="n" aria-hidden="true"></div>
+      <div class="note-resize-handle note-resize-handle-s" data-resize-edge="s" aria-hidden="true"></div>
+      <div class="note-resize-handle note-resize-handle-e" data-resize-edge="e" aria-hidden="true"></div>
+      <div class="note-resize-handle note-resize-handle-w" data-resize-edge="w" aria-hidden="true"></div>
+      <div class="note-resize-handle note-resize-handle-ne" data-resize-edge="ne" aria-hidden="true"></div>
+      <div class="note-resize-handle note-resize-handle-nw" data-resize-edge="nw" aria-hidden="true"></div>
+      <div class="note-resize-handle note-resize-handle-se" data-resize-edge="se" aria-hidden="true"></div>
+      <div class="note-resize-handle note-resize-handle-sw" data-resize-edge="sw" aria-hidden="true"></div>
+    </main>
+    <script type="module" src="./note.js?v=20260615-v013"></script>
+  </body>
+</html>

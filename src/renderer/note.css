@@ -1,0 +1,356 @@
+:root {
+  color-scheme: light;
+  --note-color: #fff2a8;
+  --note-text: #202124;
+  --note-muted: rgba(32, 33, 36, 0.62);
+  --note-font-size: 15px;
+  --note-shadow: 0 18px 38px rgba(15, 23, 42, 0.2);
+  --note-soft-shadow: 0 8px 18px rgba(32, 33, 36, 0.12);
+  --note-inset: inset 0 1px 2px rgba(255, 255, 255, 0.36), inset 0 -1px 2px rgba(32, 33, 36, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.note-shell {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  place-items: stretch;
+}
+
+.note-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  padding: clamp(14px, 6vmin, 22px);
+  border: 1px solid rgba(32, 33, 36, 0.06);
+  background:
+    linear-gradient(320deg, rgba(32, 33, 36, 0.04), transparent 46%),
+    var(--note-color);
+  box-shadow: var(--note-shadow);
+  color: var(--note-text);
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    filter 180ms ease;
+  cursor: grab;
+}
+
+.note-card:active {
+  cursor: grabbing;
+}
+
+.note-shell[data-shape="rounded"] .note-card {
+  border-radius: 30px;
+}
+
+.note-shell[data-shape="circle"] .note-card {
+  border-radius: 999px;
+  padding: 17% 15% 14%;
+}
+
+.note-shell[data-shape="triangle"] .note-card {
+  padding: 26% 15% 10%;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.note-shell[data-shape="star"] .note-card {
+  padding: 26% 20% 18%;
+  clip-path: polygon(
+    50% 0%,
+    61% 32%,
+    95% 32%,
+    67% 51%,
+    78% 86%,
+    50% 65%,
+    22% 86%,
+    33% 51%,
+    5% 32%,
+    39% 32%
+  );
+}
+
+.note-shell[data-shape="heart"] .note-card {
+  padding: 23% 16% 17%;
+  clip-path: polygon(
+    50% 92%,
+    13% 56%,
+    7% 31%,
+    18% 12%,
+    38% 8%,
+    50% 21%,
+    62% 8%,
+    82% 12%,
+    93% 31%,
+    87% 56%
+  );
+}
+
+.note-shell[data-shape="hexagon"] .note-card {
+  padding: 13% 15%;
+  clip-path: polygon(18% 0, 82% 0, 100% 50%, 82% 100%, 18% 100%, 0 50%);
+}
+
+.note-card.is-reminding {
+  filter: saturate(1.18);
+  transform: scale(1.035);
+  box-shadow:
+    0 0 0 3px rgba(74, 111, 213, 0.16),
+    0 22px 52px rgba(15, 23, 42, 0.28);
+}
+
+.note-drag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: calc(var(--note-font-size) * 2.2);
+}
+
+.note-grip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: calc(var(--note-font-size) * 1.55);
+  padding: 0 0.55em;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.36);
+  box-shadow: var(--note-inset);
+  color: var(--note-muted);
+  font-size: max(10px, calc(var(--note-font-size) * 0.72));
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.note-title,
+.note-text {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--note-text);
+  -webkit-app-region: no-drag;
+}
+
+.note-title {
+  font-size: calc(var(--note-font-size) * 1.16);
+  font-weight: 850;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.46);
+}
+
+.note-close {
+  display: grid;
+  position: relative;
+  z-index: 12;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: var(--note-soft-shadow);
+  color: var(--note-text);
+  cursor: pointer;
+  font-size: calc(var(--note-font-size) * 1.2);
+  line-height: 1;
+  -webkit-app-region: no-drag;
+}
+
+.note-close:hover {
+  background: rgba(255, 255, 255, 0.72);
+  transform: translateY(-1px);
+}
+
+.note-text {
+  flex: 1;
+  margin-top: 10px;
+  padding: 2px 0;
+  cursor: text;
+  resize: none;
+  font-size: var(--note-font-size);
+  font-weight: 560;
+  line-height: 1.55;
+}
+
+.note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--note-muted);
+  cursor: grab;
+  font-size: max(10px, calc(var(--note-font-size) * 0.72));
+  font-weight: 750;
+}
+
+.note-resize {
+  position: absolute;
+  z-index: 14;
+  right: 12px;
+  bottom: 12px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background:
+    linear-gradient(135deg, transparent 50%, rgba(32, 33, 36, 0.28) 0) right 5px bottom 5px / 7px 7px no-repeat,
+    linear-gradient(135deg, transparent 50%, rgba(32, 33, 36, 0.18) 0) right 10px bottom 5px / 7px 7px no-repeat,
+    rgba(255, 255, 255, 0.3);
+  box-shadow: var(--note-soft-shadow);
+  cursor: nwse-resize;
+  opacity: 0.7;
+  -webkit-app-region: no-drag;
+}
+
+.note-resize:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+  opacity: 1;
+}
+
+.note-resize-handle {
+  position: absolute;
+  z-index: 10;
+  border: 0;
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+
+.note-resize-handle::after {
+  position: absolute;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  content: "";
+  pointer-events: none;
+}
+
+.note-resize-handle:hover::after,
+.note-shell.is-resizing .note-resize-handle::after {
+  opacity: 1;
+}
+
+.note-resize-handle-n,
+.note-resize-handle-s {
+  right: 30px;
+  left: 30px;
+  height: 12px;
+  cursor: ns-resize;
+}
+
+.note-resize-handle-n {
+  top: 0;
+}
+
+.note-resize-handle-s {
+  bottom: 0;
+}
+
+.note-resize-handle-e,
+.note-resize-handle-w {
+  top: 30px;
+  bottom: 30px;
+  width: 12px;
+  cursor: ew-resize;
+}
+
+.note-resize-handle-e {
+  right: 0;
+}
+
+.note-resize-handle-w {
+  left: 0;
+}
+
+.note-resize-handle-ne,
+.note-resize-handle-nw,
+.note-resize-handle-se,
+.note-resize-handle-sw {
+  width: 30px;
+  height: 30px;
+}
+
+.note-resize-handle-ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+
+.note-resize-handle-nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+
+.note-resize-handle-se {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+}
+
+.note-resize-handle-sw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+
+.note-resize-handle-ne::after,
+.note-resize-handle-nw::after,
+.note-resize-handle-se::after,
+.note-resize-handle-sw::after {
+  width: 9px;
+  height: 9px;
+  border-color: rgba(32, 33, 36, 0.34);
+  border-style: solid;
+}
+
+.note-resize-handle-ne::after {
+  top: 10px;
+  right: 10px;
+  border-width: 2px 2px 0 0;
+}
+
+.note-resize-handle-nw::after {
+  top: 10px;
+  left: 10px;
+  border-width: 2px 0 0 2px;
+}
+
+.note-resize-handle-se::after {
+  right: 10px;
+  bottom: 10px;
+  border-width: 0 2px 2px 0;
+}
+
+.note-resize-handle-sw::after {
+  bottom: 10px;
+  left: 10px;
+  border-width: 0 0 2px 2px;
+}
