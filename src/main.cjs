@@ -45,6 +45,7 @@ const { GitLabConfigStore } = require('./gitlab/config-store.cjs');
 const { GitLabTokenStore } = require('./gitlab/token-store.cjs');
 const { registerGitLabIpc } = require('./gitlab/ipc.cjs');
 const { APP_META } = require('./app-meta.cjs');
+const { DEFAULT_PLANTUML_SERVER, buildPlantUmlUrl, normalizePlantUmlSource } = require('./plantuml.cjs');
 
 app.setName(APP_META.displayName);
 app.setAppUserModelId(APP_META.bundleId);
@@ -735,6 +736,47 @@ app.whenReady().then(async () => {
       size: converted.buffer.length,
       warnings: converted.warnings
     };
+  });
+
+  ipcMain.handle('plantuml:render', async (_event, { source, serverUrl, format } = {}) => {
+    const normalizedSource = normalizePlantUmlSource(source);
+    const outputFormat = String(format || 'svg').toLowerCase();
+    const url = buildPlantUmlUrl({
+      source: normalizedSource,
+      serverUrl: serverUrl || DEFAULT_PLANTUML_SERVER,
+      format: outputFormat
+    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    let response;
+    try {
+      response = await fetch(url, {
+        headers: { Accept: outputFormat === 'svg' ? 'image/svg+xml,text/plain;q=0.9,*/*;q=0.8' : 'image/png,*/*;q=0.8' },
+        signal: controller.signal
+      });
+    } catch (error) {
+      if (error?.name === 'AbortError') throw new Error('PlantUML 渲染超时，请检查 Server 地址或稍后重试');
+      throw new Error(`PlantUML 渲染失败：${error.message || error}`);
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(`PlantUML Server 返回 ${response.status}${detail ? `：${detail.slice(0, 240)}` : ''}`);
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const baseName = `plantuml-${Date.now()}`;
+    const result = {
+      base64: buffer.toString('base64'),
+      fileName: `${baseName}.${outputFormat}`,
+      mimeType: outputFormat === 'svg' ? 'image/svg+xml' : 'image/png',
+      size: buffer.length,
+      format: outputFormat,
+      source: normalizedSource,
+      url
+    };
+    if (outputFormat === 'svg') result.svg = buffer.toString('utf8');
+    return result;
   });
 
   ipcMain.handle('file:save-converted', async (_event, { base64, fileName }) => {

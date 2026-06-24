@@ -647,6 +647,17 @@ const tools = [
     run: () => ({ ok: true, value: '', view: 'markdown-docx' })
   },
   {
+    id: 'plantuml',
+    name: 'PUML 绘图',
+    category: '绘图',
+    keywords: ['plantuml', 'puml', 'uml', 'sequence', 'class', 'diagram', '时序图', '类图', '流程图', '绘图'],
+    description: '输入 PlantUML / PUML 文本，渲染预览并导出 SVG 或 PNG。',
+    inputMode: 'none',
+    sampleInput: '',
+    actions: [{ id: 'render', label: '打开绘图器' }],
+    run: () => ({ ok: true, value: '', view: 'plantuml' })
+  },
+  {
     id: 'qr',
     name: '二维码工具',
     category: '生成',
@@ -958,6 +969,14 @@ const state = {
     sourceName: '',
     result: null,
     loading: false,
+    error: ''
+  },
+  plantUml: {
+    source: '@startuml\nactor User\nparticipant ElectronToolKit\nUser -> ElectronToolKit: 输入 PUML\nElectronToolKit --> User: 渲染图表\n@enduml',
+    serverUrl: 'https://www.plantuml.com/plantuml',
+    sourceName: '',
+    loading: false,
+    result: null,
     error: ''
   },
   ccSwitch: {
@@ -1722,6 +1741,11 @@ function renderOutput(value, options = {}) {
 
     if (options.view === 'markdown-docx') {
       renderMarkdownDocxTool();
+      return;
+    }
+
+    if (options.view === 'plantuml') {
+      renderPlantUmlTool();
       return;
     }
 
@@ -3518,6 +3542,185 @@ async function convertMarkdownDocx() {
     current.loading = false;
     renderMarkdownDocxTool();
   }
+}
+
+function renderPlantUmlTool() {
+  const current = state.plantUml;
+  state.lastOutput = current.result?.svg || current.result?.url || current.error || '';
+
+  const panel = document.createElement('div');
+  panel.className = 'plantuml-panel';
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.puml,.plantuml,.iuml,.txt,text/plain';
+  fileInput.className = 'visually-hidden';
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (file) await loadPlantUmlFile(file);
+  });
+
+  const editorCard = document.createElement('div');
+  editorCard.className = 'format-convert-card plantuml-editor-card';
+
+  const editorHead = document.createElement('div');
+  editorHead.className = 'plantuml-editor-head';
+  const editorTitle = document.createElement('strong');
+  editorTitle.textContent = current.sourceName || 'PlantUML / PUML';
+  const chooseButton = document.createElement('button');
+  chooseButton.type = 'button';
+  chooseButton.className = 'secondary-button';
+  chooseButton.textContent = current.sourceName ? '重新选择' : '选择文件';
+  chooseButton.addEventListener('click', () => fileInput.click());
+  editorHead.append(editorTitle, chooseButton, fileInput);
+
+  const textarea = document.createElement('textarea');
+  textarea.className = 'plantuml-textarea';
+  textarea.spellcheck = false;
+  textarea.value = current.source;
+  textarea.placeholder = '@startuml\nAlice -> Bob: Hello\n@enduml';
+  textarea.addEventListener('input', () => {
+    current.source = textarea.value;
+    current.result = null;
+    current.error = '';
+  });
+
+  editorCard.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    editorCard.classList.add('drag-over');
+  });
+  editorCard.addEventListener('dragleave', () => editorCard.classList.remove('drag-over'));
+  editorCard.addEventListener('drop', async (event) => {
+    event.preventDefault();
+    editorCard.classList.remove('drag-over');
+    const file = event.dataTransfer?.files?.[0];
+    if (file) await loadPlantUmlFile(file);
+  });
+
+  editorCard.append(editorHead, textarea);
+
+  const controlCard = document.createElement('div');
+  controlCard.className = 'format-convert-card plantuml-control-card';
+
+  const serverLabel = document.createElement('label');
+  serverLabel.className = 'markdown-docx-field';
+  serverLabel.innerHTML = '<span>PlantUML Server</span>';
+  const serverInput = document.createElement('input');
+  serverInput.type = 'url';
+  serverInput.value = current.serverUrl;
+  serverInput.placeholder = 'https://www.plantuml.com/plantuml';
+  serverInput.addEventListener('input', () => {
+    current.serverUrl = serverInput.value;
+  });
+  serverLabel.append(serverInput);
+
+  const hint = document.createElement('div');
+  hint.className = 'plantuml-hint';
+  hint.textContent = '默认使用公共 PlantUML Server；涉及敏感内容时请改成内网或本地 PlantUML Server。';
+
+  const renderButton = document.createElement('button');
+  renderButton.type = 'button';
+  renderButton.className = 'primary-button plantuml-render-button';
+  renderButton.textContent = current.loading ? '正在渲染...' : '渲染预览';
+  renderButton.disabled = current.loading || !current.source.trim();
+  renderButton.addEventListener('click', () => renderPlantUml('svg'));
+
+  controlCard.append(serverLabel, hint, renderButton);
+
+  const resultCard = document.createElement('div');
+  resultCard.className = 'image-result-card plantuml-result-card';
+  if (current.result) {
+    const title = document.createElement('strong');
+    title.textContent = current.result.fileName;
+    const meta = document.createElement('span');
+    meta.textContent = `${current.result.format.toUpperCase()} · ${formatBytes(current.result.size)}`;
+    const preview = document.createElement('div');
+    preview.className = 'converted-preview plantuml-preview';
+    const img = document.createElement('img');
+    img.src = `data:${current.result.mimeType};base64,${current.result.base64}`;
+    img.alt = 'PlantUML preview';
+    preview.append(img);
+
+    const actions = document.createElement('div');
+    actions.className = 'plantuml-actions';
+    const saveSvg = document.createElement('button');
+    saveSvg.type = 'button';
+    saveSvg.className = 'secondary-button';
+    saveSvg.textContent = '保存 SVG';
+    saveSvg.addEventListener('click', () => savePlantUmlResult('svg'));
+    const savePng = document.createElement('button');
+    savePng.type = 'button';
+    savePng.className = 'primary-button';
+    savePng.textContent = '导出 PNG';
+    savePng.addEventListener('click', () => savePlantUmlResult('png'));
+    actions.append(saveSvg, savePng);
+
+    resultCard.append(title, meta, preview, actions);
+  } else if (current.error) {
+    resultCard.innerHTML = `<strong>渲染失败</strong><span>${escapeHtml(current.error)}</span>`;
+  } else {
+    resultCard.innerHTML = '<strong>等待渲染</strong><span>输入 PUML 后点击渲染预览</span><div class="converted-preview plantuml-preview">PUML → SVG / PNG</div>';
+  }
+
+  panel.append(editorCard, controlCard, resultCard);
+  elements.output.replaceChildren(panel);
+}
+
+async function loadPlantUmlFile(file) {
+  const text = await readFileAsText(file);
+  state.plantUml = {
+    ...state.plantUml,
+    source: text,
+    sourceName: file.name,
+    result: null,
+    error: ''
+  };
+  setStatus('PUML 已载入');
+  renderPlantUmlTool();
+}
+
+async function renderPlantUml(format = 'svg') {
+  const current = state.plantUml;
+  if (!current.source.trim()) {
+    setStatus('请输入 PUML 内容', true);
+    return null;
+  }
+  try {
+    current.loading = true;
+    current.error = '';
+    renderPlantUmlTool();
+    setStatus(format === 'png' ? '正在导出 PNG...' : '正在渲染 PUML...');
+    const result = await window.toolkit.renderPlantUml({
+      source: current.source,
+      serverUrl: current.serverUrl,
+      format
+    });
+    if (format === 'svg') {
+      current.result = result;
+      state.lastOutput = result.svg || result.url;
+    }
+    setStatus(format === 'png' ? 'PNG 已生成' : 'PUML 渲染成功');
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    current.error = message;
+    setStatus(message, true);
+    return null;
+  } finally {
+    current.loading = false;
+    renderPlantUmlTool();
+  }
+}
+
+async function savePlantUmlResult(format) {
+  const current = state.plantUml;
+  const result = format === 'svg' ? current.result : await renderPlantUml('png');
+  if (!result) return;
+  const saved = await window.toolkit.saveConvertedFile({
+    base64: result.base64,
+    fileName: result.fileName
+  });
+  if (!saved.canceled) setStatus(`已保存：${saved.filePath}`);
 }
 
 function renderCcSwitchTool() {

@@ -90,6 +90,13 @@ const { convertImageBuffer } = require('../src/image-converter.cjs');
 const { markdownToDocxBuffer, sanitizeDocxFileName } = require('../src/markdown-docx.cjs');
 const { calculateFileHashes, normalizeHashAlgorithms } = require('../src/file-hash.cjs');
 const {
+  buildPlantUmlUrl,
+  decodePlantUml,
+  encodePlantUml,
+  normalizePlantUmlServerUrl,
+  normalizePlantUmlSource
+} = require('../src/plantuml.cjs');
+const {
   accountFromInput,
   accountWithCode,
   decodeBase32,
@@ -113,6 +120,52 @@ const {
 const sharp = require('sharp');
 const JSZip = require('jszip');
 const execFileAsync = promisify(execFile);
+
+test('normalizes PlantUML source wrappers', () => {
+  assert.equal(
+    normalizePlantUmlSource('Alice -> Bob: hello'),
+    '@startuml\nAlice -> Bob: hello\n@enduml'
+  );
+  assert.equal(
+    normalizePlantUmlSource('@startuml\nAlice -> Bob: hello\n@enduml'),
+    '@startuml\nAlice -> Bob: hello\n@enduml'
+  );
+  assert.equal(
+    normalizePlantUmlSource('@startmindmap\n* root\n@endmindmap'),
+    '@startmindmap\n* root\n@endmindmap'
+  );
+  assert.throws(() => normalizePlantUmlSource('   '), /请输入 PUML 内容/);
+});
+
+test('encodes and decodes PlantUML payloads', () => {
+  const source = '@startuml\nactor User\nUser -> ElectronToolKit: render\n@enduml';
+  const encoded = encodePlantUml(source);
+  assert.match(encoded, /^[0-9A-Za-z_-]+$/);
+  assert.equal(decodePlantUml(encoded), source);
+});
+
+test('builds PlantUML render URLs', () => {
+  const svgUrl = buildPlantUmlUrl({
+    source: 'Alice -> Bob: hello',
+    serverUrl: 'https://example.com/plantuml/',
+    format: 'svg'
+  });
+  assert.match(svgUrl, /^https:\/\/example\.com\/plantuml\/svg\/[0-9A-Za-z_-]+$/);
+  assert.equal(
+    decodePlantUml(svgUrl.split('/').at(-1)),
+    '@startuml\nAlice -> Bob: hello\n@enduml'
+  );
+
+  const pngUrl = buildPlantUmlUrl({
+    source: '@startuml\nA -> B\n@enduml',
+    serverUrl: 'http://localhost:8080/plantuml',
+    format: 'png'
+  });
+  assert.match(pngUrl, /^http:\/\/localhost:8080\/plantuml\/png\//);
+  assert.equal(normalizePlantUmlServerUrl('https://example.com/plantuml///'), 'https://example.com/plantuml');
+  assert.throws(() => normalizePlantUmlServerUrl('file:///tmp/plantuml'), /http:\/\/ 或 https:\/\//);
+  assert.throws(() => buildPlantUmlUrl({ source: 'A -> B', format: 'pdf' }), /不支持的 PlantUML 输出格式/);
+});
 
 test('normalizes and decodes Base32 TOTP secrets', () => {
   assert.equal(normalizeBase32Secret('abcd ef-gh=='), 'ABCDEFGH');

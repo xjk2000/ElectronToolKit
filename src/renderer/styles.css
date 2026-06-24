@@ -2689,6 +2689,92 @@ textarea:focus {
   letter-spacing: 0.04em;
 }
 
+.plantuml-panel {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(210px, 0.75fr) minmax(260px, 1fr);
+  gap: 12px;
+  min-height: 420px;
+  padding: 14px;
+  color: var(--text);
+  white-space: normal;
+}
+
+.plantuml-editor-card {
+  gap: 12px;
+}
+
+.plantuml-editor-card.drag-over {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel-strong));
+}
+
+.plantuml-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.plantuml-editor-head strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plantuml-textarea {
+  width: 100%;
+  min-height: 310px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  outline: 0;
+  background: var(--code-bg);
+  color: var(--text);
+  resize: vertical;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.plantuml-control-card {
+  justify-content: flex-start;
+}
+
+.plantuml-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.plantuml-render-button {
+  min-height: 42px;
+}
+
+.plantuml-result-card {
+  min-height: 0;
+}
+
+.plantuml-preview {
+  min-height: 300px;
+  padding: 12px;
+  background: var(--code-bg);
+  font-size: 20px;
+  letter-spacing: 0.02em;
+}
+
+.plantuml-preview img {
+  max-height: 100%;
+}
+
+.plantuml-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .markdown-docx-warnings {
   display: grid;
   gap: 5px;
@@ -10692,6 +10778,10 @@ textarea.json-edit-input {
   }
 
   .markdown-docx-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .plantuml-panel {
     grid-template-columns: 1fr;
   }
 

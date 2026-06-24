@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('toolkit', {
   qrDecode: (dataUrl) => ipcRenderer.invoke('qr:decode', { dataUrl }),
   convertImage: (payload) => ipcRenderer.invoke('image:convert', payload),
   convertMarkdownToDocx: (payload) => ipcRenderer.invoke('markdown:docx', payload),
+  renderPlantUml: (payload) => ipcRenderer.invoke('plantuml:render', payload),
   saveConvertedFile: (payload) => ipcRenderer.invoke('file:save-converted', payload),
   ccSwitchList: () => ipcRenderer.invoke('cc-switch:list'),
   ccSwitchSaveProvider: (payload) => ipcRenderer.invoke('cc-switch:save-provider', payload),

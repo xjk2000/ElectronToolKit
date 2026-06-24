@@ -1,6 +1,6 @@
 {
   "name": "electron-toolkit-desktop",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "productName": "ElectronToolKit",
   "description": "An Electron-based local desktop utility toolbox.",
   "main": "src/main.cjs",
