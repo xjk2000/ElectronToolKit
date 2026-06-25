@@ -11,7 +11,7 @@ const { cloneURL, sanitizeGitMessage, stripCredentials } = require('../src/gitla
 const { mergeConfigs } = require('../src/gitlab/config-store.cjs');
 const { GitLabClient } = require('../src/gitlab/gitlab-client.cjs');
 const { localRepoStatus } = require('../src/gitlab/local-repo.cjs');
-const { normalizeCloneRoot, normalizeConfig, normalizeProject } = require('../src/gitlab/models.cjs');
+const { normalizeCloneRoot, normalizeConfig, normalizePipeline, normalizeProject } = require('../src/gitlab/models.cjs');
 
 test('normalizes GitLab config with safe defaults', () => {
   const config = normalizeConfig({
@@ -79,6 +79,26 @@ test('builds and sanitizes HTTPS clone URLs', () => {
   assert.equal(cloneURL(project, 'ssh', 'secret-token'), 'git@gitlab.example.com:group/repo.git');
 });
 
+test('normalizes GitLab pipeline triggerer', () => {
+  const pipeline = normalizePipeline({
+    id: 99,
+    status: 'success',
+    ref: 'main',
+    user: {
+      id: 7,
+      username: 'alice',
+      name: 'Alice Zhang',
+      avatar_url: 'https://gitlab.example.com/avatar.png',
+      web_url: 'https://gitlab.example.com/alice'
+    }
+  });
+  assert.equal(pipeline.triggerer.username, 'alice');
+  assert.equal(pipeline.triggerer.displayName, 'alice');
+  assert.equal(pipeline.triggerer.name, 'Alice Zhang');
+  assert.equal(pipeline.triggerer.avatarURL, 'https://gitlab.example.com/avatar.png');
+  assert.equal(pipeline.triggerer.webURL, 'https://gitlab.example.com/alice');
+});
+
 test('reads local repo cloned status and current branch', async () => {
   const root = await mkdtemp(join(tmpdir(), 'toolkit-gitlab-'));
   const repo = join(root, 'group', 'repo');
@@ -120,4 +140,20 @@ test('GitLab client fetches paginated project list', async () => {
   assert.equal(projects[0].instanceId, 'inst-1');
   assert.equal(seen[0].token, 'tk');
   assert.match(seen[0].url, /membership=true/);
+});
+
+test('GitLab client keeps pipeline triggerer from monitor requests', async () => {
+  const fetch = async () => new Response(JSON.stringify([
+    {
+      id: 3,
+      status: 'success',
+      ref: 'test-20260326',
+      web_url: 'https://gitlab.example.com/group/repo/-/pipelines/3',
+      user: { id: 7, username: 'alice', name: 'Alice Zhang' }
+    }
+  ]), { status: 200 });
+  const client = new GitLabClient({ id: 'inst-1', baseURL: 'https://gitlab.example.com' }, 'tk', { fetch });
+  const pipeline = await client.currentOrLatestPipeline(1, { type: 'fixed', value: 'test-20260326' });
+  assert.equal(pipeline.triggerer.username, 'alice');
+  assert.equal(pipeline.webURL, 'https://gitlab.example.com/group/repo/-/pipelines/3');
 });

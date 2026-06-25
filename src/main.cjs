@@ -319,6 +319,7 @@ function buildGitLabInstanceTrayMenu(instance, config) {
           statusLabel: '未知',
           resolvedBranch: '',
           webURL: '',
+          triggerer: null,
           errorMessage: ''
         };
         return {
@@ -361,9 +362,21 @@ function formatGitLabMonitorMenuLabel(status) {
   const state = gitLabMenuStatusText(status.status, status.statusLabel);
   const branch = status.resolvedBranch || gitLabWatchLabel(status.watch);
   const project = truncateMiddle(status.target?.pathWithNamespace || '', 34);
-  const suffix = branch ? ` · ${truncateMiddle(branch, 18)}` : '';
+  const triggerer = gitLabTriggererText(status.triggerer);
+  const parts = [
+    branch ? truncateMiddle(branch, 18) : '',
+    triggerer ? `触发 ${truncateMiddle(triggerer, 18)}` : ''
+  ].filter(Boolean);
+  const suffix = parts.length ? ` · ${parts.join(' · ')}` : '';
   if (status.errorMessage) return `× ${project}${suffix}`;
   return `${gitLabStatusSymbol(status.status)} ${state}  ${project}${suffix}`;
+}
+
+function gitLabTriggererText(triggerer) {
+  if (!triggerer) return '';
+  const username = String(triggerer.username || '').trim();
+  if (username) return username.startsWith('@') ? username : `@${username}`;
+  return String(triggerer.displayName || triggerer.name || '').trim();
 }
 
 function gitLabStatusSymbol(status) {

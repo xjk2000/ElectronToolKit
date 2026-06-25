@@ -11265,7 +11265,12 @@ function renderGitLabMonitor() {
     text.innerHTML = `<strong>${escapeHtml(target.pathWithNamespace)}</strong><small>${escapeHtml((target.watches || []).map((watch) => `${watch.role}: ${gitlabSelectorText(watch.selector)}`).join('，'))}</small>`;
     const badge = document.createElement('span');
     badge.className = `gitlab-chip ${status?.status || 'unknown'}`;
-    badge.textContent = status?.errorMessage || `${status?.statusLabel || '未知'}${status?.resolvedBranch ? ` · ${status.resolvedBranch}` : ''}`;
+    const triggerer = gitlabTriggererText(status?.triggerer);
+    badge.textContent = status?.errorMessage || [
+      status?.statusLabel || '未知',
+      status?.resolvedBranch || '',
+      triggerer ? `触发 ${triggerer}` : ''
+    ].filter(Boolean).join(' · ');
     row.append(text, badge);
     targetList.append(row);
   });
@@ -11331,6 +11336,13 @@ function gitlabSelectorText(selector) {
   if (selector.type === 'fixed' || selector.type === 'regex') return selector.value || '';
   if (selector.type === 'rule') return `${selector.prefix}${selector.separator || '-'}...`;
   return '';
+}
+
+function gitlabTriggererText(triggerer) {
+  if (!triggerer) return '';
+  const username = String(triggerer.username || '').trim();
+  if (username) return username.startsWith('@') ? username : `@${username}`;
+  return String(triggerer.displayName || triggerer.name || '').trim();
 }
 
 function normalizeGitLabBranchInput(value) {

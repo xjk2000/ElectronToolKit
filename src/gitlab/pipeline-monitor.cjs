@@ -42,6 +42,7 @@ async function refreshPipelineMonitor(config, tokenProvider) {
           webURL: result.webURL,
           updatedAt: result.updatedAt,
           startedAt: result.startedAt,
+          triggerer: result.triggerer,
           baselineDuration
         }));
       } catch (error) {
@@ -63,6 +64,7 @@ function buildStatus(statusId, target, watch, patch = {}) {
     webURL: '',
     updatedAt: '',
     startedAt: '',
+    triggerer: null,
     baselineDuration: null,
     errorMessage: '',
     ...patch

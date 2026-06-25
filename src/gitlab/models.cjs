@@ -184,7 +184,24 @@ function normalizePipeline(dto, fallbackRef = '') {
     startedAt: dto?.started_at || dto?.startedAt || '',
     finishedAt: dto?.finished_at || dto?.finishedAt || '',
     duration: Number(dto?.duration) || 0,
-    ref: dto?.ref || fallbackRef || ''
+    ref: dto?.ref || fallbackRef || '',
+    triggerer: normalizeGitLabUser(dto?.user || dto?.triggerer || dto?.triggered_by)
+  };
+}
+
+function normalizeGitLabUser(user) {
+  if (!user || typeof user !== 'object') return null;
+  const username = String(user.username || '').trim();
+  const name = String(user.name || '').trim();
+  const displayName = username || name || (user.id ? String(user.id) : '');
+  if (!displayName) return null;
+  return {
+    id: user.id ?? null,
+    username,
+    name,
+    displayName,
+    avatarURL: String(user.avatar_url || user.avatarURL || ''),
+    webURL: String(user.web_url || user.webURL || '')
   };
 }
 
@@ -221,6 +238,7 @@ module.exports = {
   normalizeBranches,
   normalizeBranchSelector,
   normalizeConfig,
+  normalizeGitLabUser,
   normalizeInstance,
   normalizePipeline,
   normalizeProject
