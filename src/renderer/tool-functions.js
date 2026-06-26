@@ -11,6 +11,19 @@ export function formatJson(input, indent = 2) {
   }
 }
 
+export function parseStringifiedJson(input, { indent = 2, parseNested = true, maxDepth = 20 } = {}) {
+  const sizeGuard = guardJsonInputSize(input);
+  if (!sizeGuard.ok) return sizeGuard;
+
+  try {
+    const parsed = unwrapStringifiedJson(input, Math.max(1, Number(maxDepth) || 20));
+    const value = parseNested ? parseNestedJsonStrings(parsed, 0, Math.max(1, Number(maxDepth) || 20)) : parsed;
+    return { ok: true, value: JSON.stringify(value, null, indent) };
+  } catch (error) {
+    return { ok: false, error: normalizeError(error) };
+  }
+}
+
 export function formatJsonWithCompactKeys(input, compactKeys = [], indent = 2) {
   const sizeGuard = guardJsonInputSize(input);
   if (!sizeGuard.ok) return sizeGuard;
@@ -251,6 +264,47 @@ function extractExpectedHash(value) {
   return matches
     .filter((item) => isSupportedHashLength(item.length))
     .sort((a, b) => b.length - a.length)[0] ?? '';
+}
+
+function unwrapStringifiedJson(input, maxDepth) {
+  let value = JSON.parse(String(input ?? '').trim());
+  let depth = 0;
+  while (typeof value === 'string' && depth < maxDepth) {
+    const text = value.trim();
+    if (!looksLikeAnyJson(text)) break;
+    value = JSON.parse(text);
+    depth += 1;
+  }
+  return value;
+}
+
+function parseNestedJsonStrings(value, depth, maxDepth) {
+  if (depth >= maxDepth) return value;
+  if (Array.isArray(value)) return value.map((item) => parseNestedJsonStrings(item, depth + 1, maxDepth));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, parseNestedJsonStrings(item, depth + 1, maxDepth)])
+    );
+  }
+  if (typeof value !== 'string') return value;
+
+  const text = value.trim();
+  if (!looksLikeJsonContainer(text)) return value;
+  try {
+    return parseNestedJsonStrings(JSON.parse(text), depth + 1, maxDepth);
+  } catch {
+    return value;
+  }
+}
+
+function looksLikeAnyJson(text) {
+  return looksLikeJsonContainer(text)
+    || /^"(?:[^"\\]|\\.)*"$/.test(text)
+    || /^(true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:e[+-]?\d+)?)$/i.test(text);
+}
+
+function looksLikeJsonContainer(text) {
+  return (text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'));
 }
 
 function isSupportedHashLength(length) {

@@ -31,6 +31,7 @@ import {
   jsonToTypeScript,
   JSON_INPUT_CHAR_LIMIT,
   minifyJson,
+  parseStringifiedJson,
   queryJsonPath,
   sortJsonKeys,
   stringifyJsonWithCompactKeysValue,
@@ -210,6 +211,46 @@ test('builds TOTP accounts and current code payloads from manual input', () => {
 
 test('formats JSON with stable indentation', () => {
   assert.equal(formatJson('{"a":1,"b":true}').value, '{\n  "a": 1,\n  "b": true\n}');
+});
+
+test('parses stringified JSON into structured JSON', () => {
+  const input = JSON.stringify(JSON.stringify({
+    total: 1,
+    code: 0,
+    data: [{
+      amazon_order_id: '114-1157537-2673058',
+      is_buyer_requested_cancel: 'false',
+      item_price_amount: '1869.05',
+      shipping_address: JSON.stringify({
+        AddressLine1: '16200 PYRAMID WAY',
+        City: 'RENO',
+        CountryCode: 'US'
+      })
+    }]
+  }));
+  const result = parseStringifiedJson(input);
+  assert.equal(result.ok, true);
+  const parsed = JSON.parse(result.value);
+  assert.equal(parsed.total, 1);
+  assert.equal(parsed.data[0].amazon_order_id, '114-1157537-2673058');
+  assert.equal(parsed.data[0].is_buyer_requested_cancel, 'false');
+  assert.equal(parsed.data[0].item_price_amount, '1869.05');
+  assert.deepEqual(parsed.data[0].shipping_address, {
+    AddressLine1: '16200 PYRAMID WAY',
+    City: 'RENO',
+    CountryCode: 'US'
+  });
+});
+
+test('parses nested JSON string containers without coercing primitive strings', () => {
+  const input = JSON.stringify({
+    payload: JSON.stringify([{ enabled: 'false', amount: '100.00' }]),
+    plain: 'not json'
+  });
+  const result = parseStringifiedJson(input);
+  const parsed = JSON.parse(result.value);
+  assert.deepEqual(parsed.payload, [{ enabled: 'false', amount: '100.00' }]);
+  assert.equal(parsed.plain, 'not json');
 });
 
 test('formats JSON while compacting selected key values', () => {

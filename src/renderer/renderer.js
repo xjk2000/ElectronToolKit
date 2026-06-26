@@ -17,6 +17,7 @@ import {
   jsonToTypeScript,
   JSON_INPUT_CHAR_LIMIT,
   minifyJson,
+  parseStringifiedJson,
   queryJsonPath,
   sortJsonKeys,
   stringifyJsonWithCompactKeysValue,
@@ -221,6 +222,19 @@ const tools = [
       if (options.compactKeys.length > 0) return formatJsonWithCompactKeys(input, options.compactKeys, 2);
       return formatJson(input, 2);
     }
+  },
+  {
+    id: 'json-stringify-parse',
+    name: '字符串 JSON 转 JSON',
+    category: '开发',
+    keywords: ['json', 'string', 'stringify', 'parse', 'escape', 'unescape', '字符串', '转义', '反转义'],
+    description: '把带转义的 JSON 字符串还原成可阅读、可展开的 JSON。',
+    inputMode: 'large',
+    inputLabel: '字符串形式的 JSON',
+    placeholder: '"{\\"total\\":1,\\"data\\":[{\\"shipping_address\\":\\"{\\\\\\"City\\\\\\":\\\\\\"RENO\\\\\\"}\\"}]}"',
+    sampleInput: '"{\\"total\\":1,\\"code\\":0,\\"data\\":[{\\"amazon_order_id\\":\\"114-1157537-2673058\\",\\"shipping_address\\":\\"{\\\\\\"City\\\\\\":\\\\\\"RENO\\\\\\",\\\\\\"CountryCode\\\\\\":\\\\\\"US\\\\\\"}\\"}]}"',
+    actions: [{ id: 'parse', label: '转成 JSON' }],
+    run: ({ input }) => ({ ...parseStringifiedJson(input, { indent: 2, parseNested: true }), view: 'json-tree' })
   },
   {
     id: 'converter',
