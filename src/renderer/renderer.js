@@ -1541,7 +1541,7 @@ function renderActiveTool() {
   elements.title.textContent = tool.name;
   elements.description.textContent = tool.description;
   elements.input.placeholder = tool.placeholder;
-  elements.editorGrid.className = `editor-grid layout-${inputMode}`;
+  elements.editorGrid.className = `editor-grid layout-${inputMode} tool-${tool.id}`;
   elements.inputPanel.hidden = inputMode === 'none';
   elements.paste.hidden = inputMode === 'none';
   elements.copy.hidden = false;

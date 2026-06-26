@@ -871,6 +871,36 @@ textarea:focus {
   white-space: normal;
 }
 
+.editor-grid.tool-json-stringify-parse {
+  gap: 18px;
+}
+
+.editor-grid.tool-json-stringify-parse textarea,
+.editor-grid.tool-json-stringify-parse .output-view {
+  border-radius: 0;
+  background: color-mix(in srgb, var(--code-bg) 98%, #ffffff);
+  box-shadow: none;
+}
+
+.editor-grid.tool-json-stringify-parse textarea:focus {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.editor-grid.tool-json-stringify-parse .output-view.json-tree {
+  border-color: color-mix(in srgb, var(--line) 90%, transparent);
+}
+
+.editor-grid.tool-json-stringify-parse .json-tree-toolbar {
+  box-shadow: none;
+}
+
+.editor-grid.tool-json-stringify-parse .json-stat-pill,
+.editor-grid.tool-json-stringify-parse .json-tree-action {
+  border-radius: 4px;
+  box-shadow: none;
+}
+
 .large-input-notice {
   display: grid;
   max-width: 720px;
