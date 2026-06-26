@@ -284,6 +284,10 @@ button {
   background: color-mix(in srgb, var(--accent-violet) 82%, #ffffff);
 }
 
+.passwords-entry::before {
+  background: color-mix(in srgb, var(--accent-coral) 82%, #ffffff);
+}
+
 .gitlab-entry::before {
   background: color-mix(in srgb, var(--accent-teal) 84%, #ffffff);
 }
@@ -3912,6 +3916,200 @@ textarea:focus {
 
 .totp-layout .panel-head {
   display: none;
+}
+
+.passwords-layout {
+  padding-top: 0;
+}
+
+.passwords-layout .output-view {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  white-space: normal;
+}
+
+.passwords-layout .panel-head {
+  display: none;
+}
+
+.passwords-tool {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 2px 0 0;
+  color: var(--text);
+}
+
+.passwords-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.passwords-metric,
+.passwords-list-card,
+.password-form-card,
+.password-row,
+.passwords-warning {
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--code-bg) 98%, var(--panel));
+  box-shadow: none;
+}
+
+.passwords-metric {
+  min-height: 64px;
+  padding: 12px 14px;
+}
+
+.passwords-metric span,
+.password-field span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+
+.passwords-metric strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.passwords-toolbar,
+.password-row-head,
+.password-row-actions,
+.password-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.passwords-body {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(320px, 0.72fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.passwords-list-card,
+.password-form-card {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.passwords-list {
+  display: grid;
+  gap: 8px;
+}
+
+.password-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.password-row-head {
+  justify-content: space-between;
+}
+
+.password-row-head strong {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.password-field-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.password-field-line code {
+  max-width: min(100%, 520px);
+  overflow: hidden;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--panel-strong) 82%, transparent);
+  color: var(--text);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.password-small-button {
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.password-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.password-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.password-field input,
+.password-form-card textarea {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  border-radius: 6px;
+  outline: 0;
+  background: var(--code-bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.password-field input {
+  height: 36px;
+  padding: 0 10px;
+}
+
+.password-form-card textarea {
+  min-height: 84px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.password-field input:focus,
+.password-form-card textarea:focus {
+  border-color: var(--accent);
+}
+
+.passwords-warning,
+.passwords-empty {
+  padding: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.passwords-warning.danger {
+  color: var(--danger);
 }
 
 .totp-tool {
@@ -10840,7 +11038,10 @@ textarea.json-edit-input {
   .totp-summary-strip,
   .totp-body,
   .totp-temp-card,
-  .totp-account-row {
+  .totp-account-row,
+  .passwords-summary,
+  .passwords-body,
+  .password-form-grid {
     grid-template-columns: 1fr;
   }
 

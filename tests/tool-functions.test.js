@@ -90,6 +90,7 @@ const { buildCodexToml, buildProviderConfigSnippets, createCcSwitchManager, norm
 const { convertImageBuffer } = require('../src/image-converter.cjs');
 const { markdownToDocxBuffer, sanitizeDocxFileName } = require('../src/markdown-docx.cjs');
 const { calculateFileHashes, normalizeHashAlgorithms } = require('../src/file-hash.cjs');
+const { createPasswordVault, parseCsv } = require('../src/password-vault.cjs');
 const {
   buildPlantUmlUrl,
   decodePlantUml,
@@ -121,6 +122,49 @@ const {
 const sharp = require('sharp');
 const JSZip = require('jszip');
 const execFileAsync = promisify(execFile);
+
+test('parses password CSV with quoted cells', () => {
+  assert.deepEqual(parseCsv('name,url,username,password\n"Site, A",https://a.test,alice,"p,a""ss"'), [
+    ['name', 'url', 'username', 'password'],
+    ['Site, A', 'https://a.test', 'alice', 'p,a"ss']
+  ]);
+});
+
+test('stores password vault entries encrypted and imports CSV aliases', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'toolkit-password-vault-'));
+  const filePath = path.join(root, 'password-vault.json');
+  const safeStorage = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(`enc:${value}`, 'utf8'),
+    decryptString: (value) => value.toString('utf8').replace(/^enc:/, '')
+  };
+  const vault = createPasswordVault({ filePath, safeStorage });
+  try {
+    await vault.load();
+    await vault.saveCredential({
+      title: 'Example',
+      url: 'https://example.com',
+      username: 'alice',
+      password: 'secret',
+      notes: 'manual'
+    });
+    const raw = JSON.parse(await readFile(filePath, 'utf8'));
+    assert.equal(raw.encryption, 'safeStorage');
+    assert.notEqual(raw.items[0].encryptedPassword.value, 'secret');
+    assert.equal(vault.revealPassword(raw.items[0].id), 'secret');
+
+    const imported = await vault.importCsvText(
+      'Title,URL,Username,Password,Notes\nApple,https://appleid.apple.com,bob,apple-secret,from export\n',
+      'apple-passwords.csv'
+    );
+    assert.deepEqual(imported, { imported: 1, updated: 0, skipped: 0 });
+    const apple = (await vault.list()).find((item) => item.username === 'bob');
+    assert.equal(apple.source, 'apple-passwords.csv');
+    assert.equal(vault.revealPassword(apple.id), 'apple-secret');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test('normalizes PlantUML source wrappers', () => {
   assert.equal(

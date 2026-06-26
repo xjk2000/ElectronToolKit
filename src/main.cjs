@@ -46,6 +46,7 @@ const { GitLabTokenStore } = require('./gitlab/token-store.cjs');
 const { registerGitLabIpc } = require('./gitlab/ipc.cjs');
 const { APP_META } = require('./app-meta.cjs');
 const { DEFAULT_PLANTUML_SERVER, buildPlantUmlUrl, normalizePlantUmlSource } = require('./plantuml.cjs');
+const { createPasswordVault } = require('./password-vault.cjs');
 
 app.setName(APP_META.displayName);
 app.setAppUserModelId(APP_META.bundleId);
@@ -69,6 +70,7 @@ let totpStorageWarning = '';
 let gitlabBridge = null;
 let ccSwitchManager = null;
 let ccSwitchTrayState = { providers: [], apps: [], currentByApp: {} };
+let passwordVault = null;
 
 function assetPath(fileName) {
   return path.join(__dirname, '..', 'build', fileName);
@@ -179,6 +181,12 @@ function buildTrayMenu() {
     {
       label: '2FA 验证码',
       submenu: buildTOTPTrayMenu()
+    },
+    {
+      label: '密码库',
+      submenu: [
+        { label: '打开密码库', click: () => openToolInMainWindow('passwords') }
+      ]
     },
     {
       label: '任务便笺',
@@ -597,6 +605,10 @@ app.whenReady().then(async () => {
     storePath: path.join(app.getPath('userData'), 'cc-switch-providers.json'),
     homeDir: app.getPath('home')
   });
+  passwordVault = createPasswordVault({
+    filePath: path.join(app.getPath('userData'), 'password-vault.json'),
+    safeStorage
+  });
   const gitlabDir = path.join(app.getPath('userData'), 'gitlab');
   const gitlabConfigStore = new GitLabConfigStore(path.join(gitlabDir, 'config.json'), { homeDir: app.getPath('home') });
   const gitlabTokenStore = new GitLabTokenStore(path.join(gitlabDir, 'tokens.json'), safeStorage);
@@ -605,6 +617,7 @@ app.whenReady().then(async () => {
   await loadTOTPSettings();
   await loadNotes();
   await loadTOTPAccounts();
+  await passwordVault.load();
 
   gitlabBridge = registerGitLabIpc({
     ipcMain,
@@ -1080,6 +1093,46 @@ app.whenReady().then(async () => {
     return { decoded, ...response };
   });
 
+  ipcMain.handle('passwords:list', async () => buildPasswordVaultResponse());
+  ipcMain.handle('passwords:save', async (_event, payload) => {
+    await passwordVault.saveCredential(payload);
+    refreshTrayMenu();
+    return buildPasswordVaultResponse();
+  });
+  ipcMain.handle('passwords:delete', async (_event, { id }) => {
+    await passwordVault.deleteCredential(id);
+    refreshTrayMenu();
+    return buildPasswordVaultResponse();
+  });
+  ipcMain.handle('passwords:reveal', (_event, { id }) => ({ password: passwordVault.revealPassword(id) }));
+  ipcMain.handle('passwords:copy-password', (_event, { id }) => {
+    clipboard.writeText(passwordVault.revealPassword(id));
+    return { ok: true };
+  });
+  ipcMain.handle('passwords:copy-account', (_event, { id }) => {
+    const item = passwordVault.findItem(id);
+    const password = passwordVault.revealPassword(id);
+    clipboard.writeText(`用户名：${item.username}\n密码：${password}`);
+    return { ok: true };
+  });
+  ipcMain.handle('passwords:import-csv', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '导入浏览器或 Apple Passwords 导出的 CSV',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'CSV', extensions: ['csv'] }]
+    });
+    if (result.canceled || result.filePaths.length === 0) return { canceled: true, ...buildPasswordVaultResponse() };
+    const summary = { imported: 0, updated: 0, skipped: 0 };
+    for (const filePath of result.filePaths) {
+      const imported = await passwordVault.importCsvFile(filePath);
+      summary.imported += imported.imported;
+      summary.updated += imported.updated;
+      summary.skipped += imported.skipped;
+    }
+    refreshTrayMenu();
+    return { canceled: false, importResult: summary, ...buildPasswordVaultResponse() };
+  });
+
   createWindow();
   createTray();
   await refreshCcSwitchTrayState();
@@ -1264,6 +1317,14 @@ function buildTOTPListResponse() {
     storagePath: totpAccountsFilePath,
     warning: totpStorageWarning,
     accounts: sortTOTPAccounts(totpAccounts).map((account) => accountWithCode(account))
+  };
+}
+
+async function buildPasswordVaultResponse() {
+  return {
+    encryption: passwordVault?.encryptionMode?.() || 'unknown',
+    warning: passwordVault?.warning || '',
+    accounts: await passwordVault.list()
   };
 }
 

@@ -888,6 +888,7 @@ const elements = {
   appVersion: document.querySelector('#app-version'),
   notesEntry: document.querySelector('#notes-entry'),
   totpEntry: document.querySelector('#totp-entry'),
+  passwordsEntry: document.querySelector('#passwords-entry'),
   gitlabEntry: document.querySelector('#gitlab-entry'),
   ccSwitchEntry: document.querySelector('#cc-switch-entry'),
   list: document.querySelector('#tool-list'),
@@ -1223,6 +1224,23 @@ const state = {
     tempResult: null,
     refreshTimer: 0
   },
+  passwordVault: {
+    loaded: false,
+    loading: false,
+    accounts: [],
+    revealed: {},
+    editingId: '',
+    form: {
+      title: '',
+      url: '',
+      username: '',
+      password: '',
+      notes: ''
+    },
+    encryption: '',
+    warning: '',
+    error: ''
+  },
   hashTool: {
     payload: 'ElectronToolKit',
     rows: [],
@@ -1334,6 +1352,7 @@ function normalizeRecentFilePaths(value) {
 function renderToolList() {
   elements.notesEntry.classList.toggle('active', state.mode === 'notes');
   elements.totpEntry.classList.toggle('active', state.mode === 'totp');
+  elements.passwordsEntry.classList.toggle('active', state.mode === 'passwords');
   elements.gitlabEntry.classList.toggle('active', state.mode === 'gitlab');
   elements.ccSwitchEntry.classList.toggle('active', state.mode === 'cc-switch');
   const query = elements.search.value.trim().toLowerCase();
@@ -2033,6 +2052,32 @@ async function openTOTPManager() {
   renderTOTPTool();
   elements.output.scrollTop = 0;
   setStatus('2FA 验证码');
+}
+
+async function openPasswordsManager() {
+  saveActiveToolInputDraft();
+  state.mode = 'passwords';
+  elements.outputSearch.hidden = true;
+  state.outputSearch.query = '';
+  elements.outputSearchInput.value = '';
+  refreshOutputSearchHighlights();
+  elements.category.textContent = '安全';
+  elements.title.textContent = '密码库';
+  elements.description.textContent = '本地保存账户密码，支持从浏览器或 Apple Passwords 导出的 CSV 导入。';
+  elements.paste.hidden = true;
+  elements.copy.hidden = true;
+  elements.controls.replaceChildren();
+  elements.options.replaceChildren();
+  elements.options.hidden = true;
+  elements.editorGrid.className = 'editor-grid layout-none passwords-layout';
+  elements.inputPanel.hidden = true;
+  elements.outputPanel.hidden = false;
+  elements.outputLabel.textContent = '密码库';
+  renderToolList();
+  renderPasswordsTool();
+  elements.output.scrollTop = 0;
+  if (!state.passwordVault.loaded && !state.passwordVault.loading) loadPasswordVault();
+  setStatus('密码库');
 }
 
 async function openGitLabManager() {
@@ -5846,6 +5891,313 @@ function renderHmacOutputBlock(title, value, copiedMessage) {
   code.textContent = value;
   block.append(head, code);
   return block;
+}
+
+function renderPasswordsTool() {
+  const data = state.passwordVault;
+  const panel = document.createElement('div');
+  panel.className = 'passwords-tool';
+
+  const summary = document.createElement('div');
+  summary.className = 'passwords-summary';
+  summary.append(
+    renderPasswordMetric('账号', String(data.accounts.length)),
+    renderPasswordMetric('加密', data.encryption === 'safeStorage' ? '系统钥匙串' : data.encryption || '-'),
+    renderPasswordMetric('来源', '手动 / CSV')
+  );
+  panel.append(summary);
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'passwords-toolbar';
+  const importCsv = document.createElement('button');
+  importCsv.type = 'button';
+  importCsv.className = 'secondary-button';
+  importCsv.textContent = '导入 CSV';
+  importCsv.disabled = data.loading;
+  importCsv.addEventListener('click', () => importPasswordsCsv());
+  const refresh = document.createElement('button');
+  refresh.type = 'button';
+  refresh.className = 'secondary-button';
+  refresh.textContent = data.loading ? '加载中' : '刷新';
+  refresh.disabled = data.loading;
+  refresh.addEventListener('click', () => loadPasswordVault({ force: true }));
+  toolbar.append(importCsv, refresh);
+  panel.append(toolbar);
+
+  if (data.warning || data.error) {
+    const warning = document.createElement('div');
+    warning.className = `passwords-warning${data.error ? ' danger' : ''}`;
+    warning.textContent = data.error || data.warning;
+    panel.append(warning);
+  }
+
+  const body = document.createElement('div');
+  body.className = 'passwords-body';
+  body.append(renderPasswordList(), renderPasswordForm());
+  panel.append(body);
+
+  state.lastOutput = data.accounts.map((item) => `${item.url}\t${item.username}`).join('\n');
+  elements.output.replaceChildren(panel);
+}
+
+function renderPasswordMetric(labelText, value) {
+  const item = document.createElement('div');
+  item.className = 'passwords-metric';
+  const label = document.createElement('span');
+  label.textContent = labelText;
+  const strong = document.createElement('strong');
+  strong.textContent = value;
+  item.append(label, strong);
+  return item;
+}
+
+function renderPasswordList() {
+  const data = state.passwordVault;
+  const panel = document.createElement('div');
+  panel.className = 'passwords-list-card';
+  const title = document.createElement('strong');
+  title.textContent = '已保存账户';
+  panel.append(title);
+
+  if (data.loading && data.accounts.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'passwords-empty';
+    empty.textContent = '正在加载密码库...';
+    panel.append(empty);
+    return panel;
+  }
+  if (data.accounts.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'passwords-empty';
+    empty.textContent = '还没有账户。可以手动添加，或从浏览器/Apple Passwords 导出的 CSV 导入。';
+    panel.append(empty);
+    return panel;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'passwords-list';
+  data.accounts.forEach((account) => list.append(renderPasswordAccountRow(account)));
+  panel.append(list);
+  return panel;
+}
+
+function renderPasswordAccountRow(account) {
+  const data = state.passwordVault;
+  const revealedPassword = data.revealed[account.id] || '';
+  const row = document.createElement('div');
+  row.className = 'password-row';
+
+  const head = document.createElement('div');
+  head.className = 'password-row-head';
+  const url = document.createElement('strong');
+  url.textContent = account.url;
+  url.title = account.url;
+  const open = document.createElement('button');
+  open.type = 'button';
+  open.className = 'secondary-button';
+  open.textContent = 'open';
+  open.addEventListener('click', () => window.open(account.url, '_blank', 'noopener'));
+  head.append(url, open);
+
+  const usernameLine = document.createElement('div');
+  usernameLine.className = 'password-field-line';
+  usernameLine.append(document.createTextNode('用户名：'));
+  const username = document.createElement('code');
+  username.textContent = account.username;
+  usernameLine.append(username, smallPasswordButton('copy', async () => {
+    await window.toolkit.writeClipboard(account.username);
+    setStatus('用户名已复制');
+  }));
+
+  const passwordLine = document.createElement('div');
+  passwordLine.className = 'password-field-line';
+  passwordLine.append(document.createTextNode('密码：'));
+  const password = document.createElement('code');
+  password.textContent = revealedPassword || '****';
+  passwordLine.append(
+    password,
+    smallPasswordButton('copy', async () => {
+      await window.toolkit.passwordsCopyPassword(account.id);
+      setStatus('密码已复制');
+    }),
+    smallPasswordButton(revealedPassword ? 'hidden' : 'show', async () => {
+      if (revealedPassword) delete data.revealed[account.id];
+      else {
+        const response = await window.toolkit.passwordsReveal(account.id);
+        data.revealed[account.id] = response.password || '';
+      }
+      renderPasswordsTool();
+    })
+  );
+
+  const actions = document.createElement('div');
+  actions.className = 'password-row-actions';
+  actions.append(
+    smallPasswordButton('复制账户和密码', async () => {
+      await window.toolkit.passwordsCopyAccount(account.id);
+      setStatus('账户和密码已复制');
+    }),
+    smallPasswordButton('编辑', () => {
+      data.editingId = account.id;
+      data.form = {
+        title: account.title || '',
+        url: account.url,
+        username: account.username,
+        password: revealedPassword || '',
+        notes: account.notes || ''
+      };
+      renderPasswordsTool();
+    }),
+    smallPasswordButton('删除', () => deletePasswordAccount(account.id))
+  );
+
+  row.append(head, usernameLine, passwordLine, actions);
+  return row;
+}
+
+function smallPasswordButton(label, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'secondary-button password-small-button';
+  button.textContent = label;
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function renderPasswordForm() {
+  const data = state.passwordVault;
+  const form = data.form;
+  const card = document.createElement('div');
+  card.className = 'password-form-card';
+  const title = document.createElement('strong');
+  title.textContent = data.editingId ? '编辑账户' : '添加账户';
+  const grid = document.createElement('div');
+  grid.className = 'password-form-grid';
+  grid.append(
+    passwordField('标题', 'text', form.title, 'Amazon / GitHub', (value) => { form.title = value; }),
+    passwordField('URL', 'url', form.url, 'https://example.com', (value) => { form.url = value; }),
+    passwordField('用户名', 'text', form.username, 'name@example.com', (value) => { form.username = value; }),
+    passwordField('密码', 'password', form.password, '输入密码', (value) => { form.password = value; })
+  );
+  const notes = document.createElement('textarea');
+  notes.value = form.notes;
+  notes.placeholder = '备注';
+  notes.addEventListener('input', () => { form.notes = notes.value; });
+  const actions = document.createElement('div');
+  actions.className = 'password-form-actions';
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.className = 'primary-button';
+  save.textContent = data.editingId ? '保存修改' : '保存账户';
+  save.addEventListener('click', () => savePasswordAccount());
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.className = 'secondary-button';
+  reset.textContent = data.editingId ? '取消编辑' : '清空';
+  reset.addEventListener('click', () => {
+    resetPasswordForm();
+    renderPasswordsTool();
+  });
+  actions.append(save, reset);
+  card.append(title, grid, notes, actions);
+  return card;
+}
+
+function passwordField(labelText, type, value, placeholder, onInput) {
+  const label = document.createElement('label');
+  label.className = 'password-field';
+  const span = document.createElement('span');
+  span.textContent = labelText;
+  const input = document.createElement('input');
+  input.type = type;
+  input.value = value;
+  input.placeholder = placeholder;
+  input.addEventListener('input', () => onInput(input.value));
+  label.append(span, input);
+  return label;
+}
+
+async function loadPasswordVault({ force = false } = {}) {
+  const data = state.passwordVault;
+  if (data.loading && !force) return;
+  data.loading = true;
+  data.error = '';
+  try {
+    const response = await window.toolkit.passwordsList();
+    data.accounts = response.accounts || [];
+    data.encryption = response.encryption || '';
+    data.warning = response.warning || '';
+    data.loaded = true;
+  } catch (error) {
+    data.error = readableErrorMessage(error);
+  } finally {
+    data.loading = false;
+    if (state.mode === 'passwords') renderPasswordsTool();
+  }
+}
+
+async function savePasswordAccount() {
+  const data = state.passwordVault;
+  try {
+    const response = await window.toolkit.passwordsSave({ id: data.editingId, ...data.form });
+    data.accounts = response.accounts || [];
+    data.encryption = response.encryption || '';
+    data.warning = response.warning || '';
+    resetPasswordForm();
+    setStatus('密码账户已保存');
+  } catch (error) {
+    data.error = readableErrorMessage(error);
+    setStatus(data.error, true);
+  }
+  renderPasswordsTool();
+}
+
+async function deletePasswordAccount(id) {
+  if (!window.confirm('确定删除这个账户密码？')) return;
+  const data = state.passwordVault;
+  try {
+    const response = await window.toolkit.passwordsDelete(id);
+    data.accounts = response.accounts || [];
+    delete data.revealed[id];
+    setStatus('密码账户已删除');
+  } catch (error) {
+    data.error = readableErrorMessage(error);
+    setStatus(data.error, true);
+  }
+  renderPasswordsTool();
+}
+
+async function importPasswordsCsv() {
+  const data = state.passwordVault;
+  try {
+    data.loading = true;
+    renderPasswordsTool();
+    const response = await window.toolkit.passwordsImportCsv();
+    if (!response.canceled) {
+      data.accounts = response.accounts || [];
+      data.encryption = response.encryption || '';
+      data.warning = response.warning || '';
+      const result = response.importResult || {};
+      setStatus(`导入 ${result.imported || 0} 个，更新 ${result.updated || 0} 个，跳过 ${result.skipped || 0} 个`);
+    }
+  } catch (error) {
+    data.error = readableErrorMessage(error);
+    setStatus(data.error, true);
+  } finally {
+    data.loading = false;
+    renderPasswordsTool();
+  }
+}
+
+function resetPasswordForm() {
+  state.passwordVault.editingId = '';
+  state.passwordVault.form = {
+    title: '',
+    url: '',
+    username: '',
+    password: '',
+    notes: ''
+  };
 }
 
 function renderTOTPTool() {
@@ -12157,6 +12509,12 @@ elements.totpEntry.addEventListener('click', () => {
     setStatus(message, true);
   });
 });
+elements.passwordsEntry.addEventListener('click', () => {
+  openPasswordsManager().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    setStatus(message, true);
+  });
+});
 elements.gitlabEntry.addEventListener('click', () => {
   openGitLabManager().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
@@ -12225,6 +12583,13 @@ elements.copy.addEventListener('click', async () => {
 window.toolkit.onSelectTool?.((toolId) => {
   if (toolId === 'totp') {
     openTOTPManager().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(message, true);
+    });
+    return;
+  }
+  if (toolId === 'passwords') {
+    openPasswordsManager().catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       setStatus(message, true);
     });
