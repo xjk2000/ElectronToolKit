@@ -3940,31 +3940,26 @@ textarea:focus {
 .passwords-tool {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 2px 0 0;
+  gap: 16px;
+  padding: 0;
   color: var(--text);
 }
 
 .passwords-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.passwords-metric,
-.passwords-list-card,
-.password-form-card,
-.password-row,
-.passwords-warning {
-  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--code-bg) 98%, var(--panel));
-  box-shadow: none;
+  gap: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
 }
 
 .passwords-metric {
-  min-height: 64px;
-  padding: 12px 14px;
+  min-height: 54px;
+  padding: 6px 14px 12px 0;
+}
+
+.passwords-metric + .passwords-metric {
+  padding-left: 14px;
+  border-left: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
 }
 
 .passwords-metric span,
@@ -3978,7 +3973,7 @@ textarea:focus {
 .passwords-metric strong {
   display: block;
   overflow: hidden;
-  margin-top: 6px;
+  margin-top: 5px;
   font-family: var(--font-mono);
   font-size: 15px;
   font-weight: 650;
@@ -3999,7 +3994,7 @@ textarea:focus {
 .passwords-body {
   display: grid;
   grid-template-columns: minmax(360px, 1fr) minmax(320px, 0.72fr);
-  gap: 14px;
+  gap: 26px;
   align-items: start;
 }
 
@@ -4007,18 +4002,33 @@ textarea:focus {
 .password-form-card {
   display: grid;
   gap: 12px;
-  padding: 12px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.passwords-list-card > strong,
+.password-form-card > strong {
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
 }
 
 .passwords-list {
   display: grid;
-  gap: 8px;
 }
 
 .password-row {
   display: grid;
-  gap: 8px;
-  padding: 10px;
+  gap: 7px;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 68%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .password-row-head {
@@ -4103,9 +4113,16 @@ textarea:focus {
 
 .passwords-warning,
 .passwords-empty {
-  padding: 12px;
+  padding: 10px 0;
   color: var(--muted);
   font-size: 13px;
+}
+
+.passwords-warning {
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: 0;
+  background: transparent;
 }
 
 .passwords-warning.danger {
