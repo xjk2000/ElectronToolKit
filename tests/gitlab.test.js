@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const require = createRequire(import.meta.url);
-const { branchSelectorRegex, branchSelectorSearchPrefix, matchesBranchSelector } = require('../src/gitlab/branch-selector.cjs');
+const { branchSelectorRegex, branchSelectorSearchPrefix, matchesBranchSelector, resolveBranch } = require('../src/gitlab/branch-selector.cjs');
 const { cloneURL, sanitizeGitMessage, stripCredentials } = require('../src/gitlab/clone-url.cjs');
 const { mergeConfigs } = require('../src/gitlab/config-store.cjs');
 const { GitLabClient } = require('../src/gitlab/gitlab-client.cjs');
@@ -63,6 +63,21 @@ test('matches dynamic branch selectors', () => {
   assert.equal(branchSelectorSearchPrefix(selector), 'release/');
   assert.equal(matchesBranchSelector('release/2026-06-16', selector), true);
   assert.equal(matchesBranchSelector('release/20260616', selector), false);
+});
+
+test('resolves latest matching dynamic branch selector', async () => {
+  const selector = { type: 'rule', prefix: 'publish', separator: '-', format: 'yyyymmdd' };
+  const seen = [];
+  const branch = await resolveBranch(selector, async (search) => {
+    seen.push(search);
+    return [
+      { name: 'publish-20260628' },
+      { name: 'publish-20260629' },
+      { name: 'test-20260629' }
+    ];
+  });
+  assert.deepEqual(seen, ['publish-']);
+  assert.equal(branch, 'publish-20260629');
 });
 
 test('builds and sanitizes HTTPS clone URLs', () => {

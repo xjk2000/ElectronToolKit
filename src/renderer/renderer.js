@@ -1121,6 +1121,7 @@ const state = {
     monitorPollInterval: 60,
     monitorBranches: {},
     monitorStatuses: [],
+    branchResolutionByKey: {},
     branchConfig: null,
     currentJob: null,
     logs: [],
@@ -10472,6 +10473,32 @@ function gitlabLocalStatuses(instance, rootDirectory) {
   return state.gitlabTool.localStatuses[gitlabLocalStatusKey(instance, rootDirectory)] || {};
 }
 
+function gitlabProjectMonitorTarget(project) {
+  return (state.gitlabTool.config?.monitor?.targets || [])
+    .find((item) => String(item.instanceId) === String(project.instanceId) && String(item.projectId) === String(project.id));
+}
+
+function gitlabProjectProductionWatch(project) {
+  return (gitlabProjectMonitorTarget(project)?.watches || []).find((watch) => watch.role === 'production') || null;
+}
+
+function gitlabBranchResolutionKey(project, selector) {
+  return JSON.stringify({
+    instanceId: project.instanceId,
+    projectId: project.id,
+    selector
+  });
+}
+
+function gitlabBranchLogPayload(project, selector, extra = {}) {
+  return {
+    instanceId: project.instanceId,
+    projectId: project.id,
+    selectorType: selector?.type || 'none',
+    ...extra
+  };
+}
+
 async function refreshGitLabLocalStatus(instance, rootDirectory) {
   if (!instance) return;
   const gitlab = state.gitlabTool;
@@ -10603,6 +10630,7 @@ function renderGitLabProjects() {
     renderGitLabTool();
     const result = await window.toolkit.gitlabRefreshProjects(instance.id);
     gitlab.projectsByInstance[instance.id] = result.projects;
+    gitlab.branchResolutionByKey = {};
     gitlab.message = `已加载 ${result.projects.length} 个项目`;
     await refreshGitLabLocalStatus(instance, rootDirectory);
     renderGitLabTool();
@@ -10670,8 +10698,7 @@ function renderGitLabProjects() {
 }
 
 function renderGitLabProjectBranchConfig(project) {
-  const target = (state.gitlabTool.config?.monitor?.targets || [])
-    .find((item) => item.instanceId === project.instanceId && item.projectId === project.id);
+  const target = gitlabProjectMonitorTarget(project);
   const wrap = document.createElement('span');
   wrap.className = 'gitlab-project-branches';
   wrap.dataset.configured = target ? 'true' : 'false';
@@ -10684,7 +10711,9 @@ function renderGitLabProjectBranchConfig(project) {
   const custom = (target.watches || []).filter((watch) => watch.role === 'custom');
   const lines = [];
   if (production) {
-    lines.push(`生产分支: ${gitlabSelectorText(production.selector)}（仅标记）`);
+    const productionBranch = gitlabResolvedBranchDisplay(project, production.selector);
+    lines.push(`生产分支: ${productionBranch}`);
+    if (production.selector?.type !== 'fixed') lines.push(`匹配规则: ${gitlabSelectorText(production.selector)}`);
     if (production.ciSelector) lines.push(`CI/CD: ${gitlabSelectorText(production.ciSelector)}`);
   }
   if (testing) {
@@ -10824,6 +10853,7 @@ function renderGitLabBranchConfigDialog() {
     });
     state.gitlabTool.config = result.config;
     state.gitlabTool.branchConfig = null;
+    state.gitlabTool.branchResolutionByKey = {};
     state.gitlabTool.message = '项目分支配置已保存';
     window.toolkit.gitlabRefreshMonitor().then((payload) => {
       state.gitlabTool.monitorStatuses = payload.statuses || [];
@@ -11120,20 +11150,62 @@ function ensureGitLabBranchMatch(draft, isCiSelector = false) {
     });
 }
 
-async function gitlabResolveBranchMatch(project, selector, requestKey) {
+function gitlabResolvedBranchDisplay(project, selector) {
+  if (!selector) return '';
+  if (selector.type === 'fixed') return String(selector.value || '').trim();
+  ensureGitLabBranchResolution(project, selector);
+  const cache = state.gitlabTool.branchResolutionByKey[gitlabBranchResolutionKey(project, selector)];
+  if (cache?.state === 'resolved' && cache.branch) return cache.branch;
+  if (cache?.state === 'failed') return `未匹配 (${cache.message})`;
+  return '解析中';
+}
+
+function ensureGitLabBranchResolution(project, selector) {
+  if (!selector || selector.type === 'fixed') return;
+  const key = gitlabBranchResolutionKey(project, selector);
+  const cache = state.gitlabTool.branchResolutionByKey[key];
+  if (cache?.state === 'loading' || cache?.state === 'resolved') return;
+  state.gitlabTool.branchResolutionByKey[key] = { state: 'loading', branch: '', message: '' };
+  console.info('[GitLabSync] resolve production branch started', gitlabBranchLogPayload(project, selector, {
+    searchPrefix: gitlabBranchSelectorSearchPrefix(selector)
+  }));
+  gitlabResolveBranchSelector(project, selector)
+    .then((branch) => {
+      state.gitlabTool.branchResolutionByKey[key] = branch
+        ? { state: 'resolved', branch, message: '' }
+        : { state: 'failed', branch: '', message: '没有匹配远程分支' };
+      console.info('[GitLabSync] resolve production branch finished', gitlabBranchLogPayload(project, selector, {
+        matched: Boolean(branch),
+        branch: branch || ''
+      }));
+      if (state.activeToolId === 'gitlab') renderGitLabTool();
+    })
+    .catch((error) => {
+      state.gitlabTool.branchResolutionByKey[key] = {
+        state: 'failed',
+        branch: '',
+        message: readableErrorMessage(error)
+      };
+      console.warn('[GitLabSync] resolve production branch failed', gitlabBranchLogPayload(project, selector, {
+        reason: readableErrorMessage(error)
+      }));
+      if (state.activeToolId === 'gitlab') renderGitLabTool();
+    });
+}
+
+async function gitlabResolveBranchSelector(project, selector) {
+  if (!selector) return '';
+  if (selector.type === 'fixed') return String(selector.value || '').trim();
   const search = gitlabBranchSelectorSearchPrefix(selector);
   const rows = await window.toolkit.gitlabListBranches(project.instanceId, project.id, search || undefined);
-  if (!state.gitlabTool.branchConfig) return '';
   const names = (Array.isArray(rows) ? rows : []).map((item) => String(item?.name || item || '')).filter(Boolean);
   const matched = names.filter((name) => gitlabMatchesBranchSelector(name, selector));
-  if (state.gitlabTool.branchConfig && requestKey !== JSON.stringify({
-    instanceId: project.instanceId,
-    projectId: project.id,
-    selector
-  })) {
-    return '';
-  }
   return matched.sort().reverse()[0] || '';
+}
+
+async function gitlabResolveBranchMatch(project, selector) {
+  if (!state.gitlabTool.branchConfig) return '';
+  return gitlabResolveBranchSelector(project, selector);
 }
 
 function gitlabMatchesBranchSelector(branch, selector) {
@@ -11409,6 +11481,46 @@ function renderGitLabCloneRootField() {
   return wrap;
 }
 
+async function buildGitLabProductionCheckoutBranches(projects) {
+  const checkoutBranches = {};
+  const failures = [];
+  await Promise.all(projects.map(async (project) => {
+    const production = gitlabProjectProductionWatch(project);
+    const selector = production?.selector;
+    if (!selector) {
+      console.debug('[GitLabSync] skip production checkout because project has no production watch', gitlabBranchLogPayload(project, selector));
+      return;
+    }
+    try {
+      // 动态生产分支必须在同步前实时解析，避免按过期缓存 checkout 到旧发布分支。
+      const branch = await gitlabResolveBranchSelector(project, selector);
+      if (!branch) {
+        failures.push({ project, reason: '未匹配到生产分支' });
+        console.warn('[GitLabSync] production checkout branch not matched', gitlabBranchLogPayload(project, selector));
+        return;
+      }
+      checkoutBranches[project.id] = branch;
+      console.info('[GitLabSync] production checkout branch resolved', gitlabBranchLogPayload(project, selector, { branch }));
+    } catch (error) {
+      const reason = readableErrorMessage(error);
+      failures.push({ project, reason });
+      console.warn('[GitLabSync] production checkout branch resolve failed', gitlabBranchLogPayload(project, selector, { reason }));
+    }
+  }));
+  console.info('[GitLabSync] production checkout branch summary', {
+    selectedCount: projects.length,
+    checkoutCount: Object.keys(checkoutBranches).length,
+    failureCount: failures.length
+  });
+  return { checkoutBranches, failures };
+}
+
+function gitlabProductionCheckoutFailureMessage(failures) {
+  return failures.slice(0, 5)
+    .map(({ project, reason }) => `${project.pathWithNamespace || project.name || project.id}: ${reason}`)
+    .join('；');
+}
+
 function renderGitLabSyncControls(instance) {
   const gitlab = state.gitlabTool;
   const toolbar = document.createElement('div');
@@ -11473,12 +11585,21 @@ function renderGitLabSyncControls(instance) {
   actions.append(renderGitLabNotice(`已选 ${selectedCount} 个项目`));
   actions.append(gitlabButton('对选中项执行同步', async () => {
     if (gitlab.cloneMode === 'reclone' && !confirm(`将删除并重新 clone ${selectedCount} 个本地目录，确定继续吗？`)) return;
+    const selectedProjectIds = [...gitlab.selectedProjectIds];
+    const selectedProjectIdSet = new Set(selectedProjectIds.map(String));
+    const selectedProjects = (gitlab.projectsByInstance[instance.id] || [])
+      .filter((project) => selectedProjectIdSet.has(String(project.id)));
+    const { checkoutBranches, failures } = await buildGitLabProductionCheckoutBranches(selectedProjects);
+    if (failures.length > 0) {
+      throw new Error(`生产分支解析失败，已停止同步：${gitlabProductionCheckoutFailureMessage(failures)}`);
+    }
     gitlab.currentJob = await window.toolkit.gitlabStartClone({
       instanceId: instance.id,
-      projectIds: [...gitlab.selectedProjectIds],
+      projectIds: selectedProjectIds,
       rootDirectory: rootInput.value,
       mode: gitlab.cloneMode,
-      maxConcurrency: gitlab.maxConcurrency
+      maxConcurrency: gitlab.maxConcurrency,
+      checkoutBranches
     });
     renderGitLabTool();
   }, 'primary-button'));
@@ -11700,7 +11821,15 @@ function gitlabStateLabel(value) {
 function gitlabSelectorText(selector) {
   if (!selector) return '';
   if (selector.type === 'fixed' || selector.type === 'regex') return selector.value || '';
-  if (selector.type === 'rule') return `${selector.prefix}${selector.separator || '-'}...`;
+  if (selector.type === 'rule') {
+    const suffix = {
+      yyyymmddDashed: '<yyyy-mm-dd>',
+      yyyymmddDotted: '<yyyy.mm.dd>',
+      yyyymmddWithTail: '<yyyymmdd-后缀>',
+      yyyymmdd: '<yyyymmdd>'
+    }[selector.format || 'yyyymmdd'] || '<yyyymmdd>';
+    return `${selector.prefix}${selector.separator || '-'}${suffix}`;
+  }
   return '';
 }
 
