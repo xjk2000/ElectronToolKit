@@ -133,10 +133,31 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => mainWindow.show());
   mainWindow.on('close', (event) => {
     if (!app.isQuitting) {
+      console.info('[AppLifecycle] main window close intercepted, hide instead', {
+        platform: process.platform,
+        processId: process.pid,
+        windowId: mainWindow.id
+      });
       event.preventDefault();
       mainWindow.hide();
+      return;
     }
+    console.info('[AppLifecycle] main window close allowed for quit', {
+      platform: process.platform,
+      processId: process.pid,
+      windowId: mainWindow.id
+    });
   });
+}
+
+function requestAppQuit(source) {
+  app.isQuitting = true;
+  console.info('[AppLifecycle] quit requested', {
+    platform: process.platform,
+    processId: process.pid,
+    source
+  });
+  app.quit();
 }
 
 function toggleWindow() {
@@ -206,10 +227,7 @@ function buildTrayMenu() {
     { type: 'separator' },
     {
       label: '退出',
-      click: () => {
-        app.isQuitting = true;
-        app.quit();
-      }
+      click: () => requestAppQuit('tray-menu')
     }
   ]);
 }
@@ -1793,6 +1811,14 @@ function sanitizeFileName(value) {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
+  console.info('[AppLifecycle] before quit received', {
+    platform: process.platform,
+    processId: process.pid
+  });
 });
 
 app.on('will-quit', () => {

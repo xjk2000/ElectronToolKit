@@ -10711,18 +10711,16 @@ function renderGitLabProjectBranchConfig(project) {
   const custom = (target.watches || []).filter((watch) => watch.role === 'custom');
   const lines = [];
   if (production) {
-    const productionBranch = gitlabResolvedBranchDisplay(project, production.selector);
-    lines.push(`生产分支: ${productionBranch}`);
-    if (production.selector?.type !== 'fixed') lines.push(`匹配规则: ${gitlabSelectorText(production.selector)}`);
-    if (production.ciSelector) lines.push(`CI/CD: ${gitlabSelectorText(production.ciSelector)}`);
+    lines.push(`生产分支: ${gitlabResolvedBranchDisplay(project, production.selector)}`);
+    if (production.ciSelector) lines.push(`CI/CD: ${gitlabResolvedBranchDisplay(project, production.ciSelector)}`);
   }
   if (testing) {
-    lines.push(`测试分支: ${gitlabSelectorText(testing.selector)}`);
-    if (testing.ciSelector) lines.push(`CI/CD: ${gitlabSelectorText(testing.ciSelector)}`);
+    lines.push(`测试分支: ${gitlabResolvedBranchDisplay(project, testing.selector)}`);
+    if (testing.ciSelector) lines.push(`CI/CD: ${gitlabResolvedBranchDisplay(project, testing.ciSelector)}`);
   }
   custom.forEach((watch, index) => {
-    lines.push(`展示分支${index + 1}: ${gitlabSelectorText(watch.selector)}`);
-    if (watch.ciSelector) lines.push(`CI/CD: ${gitlabSelectorText(watch.ciSelector)}`);
+    lines.push(`展示分支${index + 1}: ${gitlabResolvedBranchDisplay(project, watch.selector)}`);
+    if (watch.ciSelector) lines.push(`CI/CD: ${gitlabResolvedBranchDisplay(project, watch.ciSelector)}`);
   });
   wrap.textContent = lines.join('\n') || '已配置观测';
   return wrap;
@@ -11166,7 +11164,7 @@ function ensureGitLabBranchResolution(project, selector) {
   const cache = state.gitlabTool.branchResolutionByKey[key];
   if (cache?.state === 'loading' || cache?.state === 'resolved') return;
   state.gitlabTool.branchResolutionByKey[key] = { state: 'loading', branch: '', message: '' };
-  console.info('[GitLabSync] resolve production branch started', gitlabBranchLogPayload(project, selector, {
+  console.info('[GitLabSync] resolve branch started', gitlabBranchLogPayload(project, selector, {
     searchPrefix: gitlabBranchSelectorSearchPrefix(selector)
   }));
   gitlabResolveBranchSelector(project, selector)
@@ -11174,7 +11172,7 @@ function ensureGitLabBranchResolution(project, selector) {
       state.gitlabTool.branchResolutionByKey[key] = branch
         ? { state: 'resolved', branch, message: '' }
         : { state: 'failed', branch: '', message: '没有匹配远程分支' };
-      console.info('[GitLabSync] resolve production branch finished', gitlabBranchLogPayload(project, selector, {
+      console.info('[GitLabSync] resolve branch finished', gitlabBranchLogPayload(project, selector, {
         matched: Boolean(branch),
         branch: branch || ''
       }));
@@ -11186,7 +11184,7 @@ function ensureGitLabBranchResolution(project, selector) {
         branch: '',
         message: readableErrorMessage(error)
       };
-      console.warn('[GitLabSync] resolve production branch failed', gitlabBranchLogPayload(project, selector, {
+      console.warn('[GitLabSync] resolve branch failed', gitlabBranchLogPayload(project, selector, {
         reason: readableErrorMessage(error)
       }));
       if (state.activeToolId === 'gitlab') renderGitLabTool();
@@ -11749,7 +11747,11 @@ function renderGitLabMonitor() {
     row.className = 'gitlab-project-row';
     const status = gitlab.monitorStatuses.find((item) => item.target?.instanceId === target.instanceId && item.target?.projectId === target.projectId);
     const text = document.createElement('span');
-    text.innerHTML = `<strong>${escapeHtml(target.pathWithNamespace)}</strong><small>${escapeHtml((target.watches || []).map((watch) => `${watch.role}: ${gitlabSelectorText(watch.selector)}`).join('，'))}</small>`;
+    const projectLike = { ...target, id: target.projectId };
+    const watchesText = (target.watches || [])
+      .map((watch) => `${gitlabWatchRoleLabel(watch.role)}: ${gitlabResolvedBranchDisplay(projectLike, watch.selector)}`)
+      .join('，');
+    text.innerHTML = `<strong>${escapeHtml(target.pathWithNamespace)}</strong><small>${escapeHtml(watchesText)}</small>`;
     const badge = document.createElement('span');
     badge.className = `gitlab-chip ${status?.status || 'unknown'}`;
     const triggerer = gitlabTriggererText(status?.triggerer);
@@ -11818,19 +11820,8 @@ function gitlabStateLabel(value) {
   return { pending: '等待', running: '执行中', succeeded: '成功', failed: '失败', skipped: '跳过', unknown: '未知' }[value] || value;
 }
 
-function gitlabSelectorText(selector) {
-  if (!selector) return '';
-  if (selector.type === 'fixed' || selector.type === 'regex') return selector.value || '';
-  if (selector.type === 'rule') {
-    const suffix = {
-      yyyymmddDashed: '<yyyy-mm-dd>',
-      yyyymmddDotted: '<yyyy.mm.dd>',
-      yyyymmddWithTail: '<yyyymmdd-后缀>',
-      yyyymmdd: '<yyyymmdd>'
-    }[selector.format || 'yyyymmdd'] || '<yyyymmdd>';
-    return `${selector.prefix}${selector.separator || '-'}${suffix}`;
-  }
-  return '';
+function gitlabWatchRoleLabel(role) {
+  return { production: '生产分支', testing: '测试分支', custom: '展示分支' }[role] || role;
 }
 
 function gitlabTriggererText(triggerer) {
